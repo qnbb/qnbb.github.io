@@ -1,7 +1,7 @@
 ---
 layout: post
 title: 深入浅出Java反射
-categories: JAVA
+categories: Java
 description: Java反射, 编译, 加载
 keywords: 反射, 编译, 加载
 ---
