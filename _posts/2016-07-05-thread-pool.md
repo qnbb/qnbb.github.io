@@ -77,7 +77,7 @@ JDK1.5中引入了强大的concurrent包，其中最常用的莫过了线程池�
 对于以上核心的几个线程池，虽然看起来有着完全不同的功能特点，但是内部实现均使用 ThreadPoolExecutor，来看三个线程池的实现方式：
 
 ```
-	public static ExecutorService newCachedThreadPool() {
+    public static ExecutorService newCachedThreadPool() {
         return new ThreadPoolExecutor(0, Integer.MAX_VALUE,
                                       60L, TimeUnit.SECONDS,
                                       new SynchronousQueue<Runnable>());
