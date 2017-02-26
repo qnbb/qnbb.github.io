@@ -189,7 +189,9 @@ allowCoreThreadTimeout:
 ### 拒绝策略
 RejectedExecutionHandler接口提供了对于拒绝任务的处理的自定方法的机会。在ThreadPoolExecutor中已经默认包含了4中策略，因为源码非常简单，这里直接贴出来。
 
-- CallerRunsPolicy：线程调用运行该任务的 execute 本身。此策略提供简单的反馈控制机制，能够减缓新任务的提交速度。
+#### CallerRunsPolicy
+
+线程调用运行该任务的 execute 本身。此策略提供简单的反馈控制机制，能够减缓新任务的提交速度。
 
 ```
 public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
@@ -200,7 +202,9 @@ public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
 ```
 这个策略显然不想放弃执行任务。但是由于池中已经没有任何资源了，那么就直接使用调用该execute的线程本身来执行。
 
-- AbortPolicy：处理程序遭到拒绝将抛出运行时 RejectedExecutionException
+#### AbortPolicy
+
+处理程序遭到拒绝将抛出运行时 RejectedExecutionException
 
 ```
 public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
@@ -209,7 +213,8 @@ public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
 ```
  这种**策略直接抛出异常**，丢弃任务。
 
-- DiscardPolicy：不能执行的任务将被删除
+#### DiscardPolicy
+不能执行的任务将被删除
 
 ```
 public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
@@ -217,7 +222,8 @@ public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
 ```
  这种策略和AbortPolicy几乎一样，也是丢弃任务，只不过他不抛出异常。
 
-- DiscardOldestPolicy：如果执行程序尚未关闭，则位于工作队列头部的任务将被删除，然后重试执行程序（如果再次失败，则重复此过程）
+#### DiscardOldestPolicy
+如果执行程序尚未关闭，则位于工作队列头部的任务将被删除，然后重试执行程序（如果再次失败，则重复此过程）
 
 ```
 public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
