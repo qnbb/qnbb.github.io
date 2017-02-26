@@ -7,12 +7,137 @@ keywords: 线程池
 ---
 
 ### 常见的有4种线程池：
-CachedThreadPool:创建一个可缓存线程池，如果线程池长度超过处理需要，可灵活回收空闲线程，若无可回收，则新建线程。线程池为无限大，当执行第二个任务时第一个任务已经完成，会复用执行第一个任务的线程，而不用每次新建线程。
-FixedThreadPool:可控制线程最大并发数，超出的线程会在队列中等待。
-SingleThreadPool:单个的FixedThreadPool
-ScheduledThreadPool:创建一个定长线程池，支持定时及周期性任务执行。
+
+####  CachedThreadPool:
+
+创建一个可缓存线程池，如果线程池长度超过处理需要，可灵活回收空闲线程，若无可回收，则新建线程。线程池为无限大，当执行第二个任务时第一个任务已经完成，会复用执行第一个任务的线程，而不用每次新建线程。
+
+#### FixedThreadPool:固定大小的线程池
+
+可控制线程最大并发数，超出的线程会在队列中等待。
+
+```
+package threadpool;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Created by mh on 17-2-25.
+ */
+public class NewFixThreadpoolDemo {
+	public static class Mytask implements Runnable {
+		@Override
+		public void run() {
+			System.out.println(System.currentTimeMillis() + ":Thread ID:"
+				+ Thread.currentThread().getId());
+			try {
+				Thread.sleep(2000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	public static void main (String[] args) {
+		Mytask task = new Mytask();
+		ExecutorService es = Executors.newFixedThreadPool(5);
+		for(int i = 0;i < 10;i ++) {
+			es.submit(task);
+		}
+	}
+}
+```
+执行以上代码，得到类似一下输出：
+```
+1487991900426:Thread ID:9
+1487991900428:Thread ID:10
+1487991900428:Thread ID:11
+1487991900431:Thread ID:13
+1487991900437:Thread ID:12
+1487991902428:Thread ID:9
+1487991902428:Thread ID:10
+1487991902429:Thread ID:11
+1487991902431:Thread ID:13
+1487991902437:Thread ID:12
+```
+说明这10个任务是分成两个批次的，符合一个只有5个线程池的行为
+
+#### SingleThreadPool:单个的FixedThreadPool
+
+#### cheduledThreadPool:计划任务
+创建一个定长线程池，支持定时及周期性任务执行。它返回一个ScheduleExecutorService对象，可以根据时间需要对线程进行调度。
+
 
 JDK1.5中引入了强大的concurrent包，其中最常用的莫过了线程池的实现ThreadPoolExecutor，它给我们带来了极大的方便，但同时，对于该线程池不恰当的设置也可能使其效率并不能达到预期的效果，甚至仅相当于或低于单线程的效率。
+
+### 刨根问底：核心线程池的内部实现
+
+对于以上核心的几个线程池，虽然看起来有着完全不同的功能特点，但是内部实现均使用 ThreadPoolExecutor，来看三个线程池的实现方式：
+
+```
+	public static ExecutorService newCachedThreadPool() {
+        return new ThreadPoolExecutor(0, Integer.MAX_VALUE,
+                                      60L, TimeUnit.SECONDS,
+                                      new SynchronousQueue<Runnable>());
+    }
+
+    public static ExecutorService newSingleThreadExecutor() {
+        return new FinalizableDelegatedExecutorService
+            (new ThreadPoolExecutor(1, 1,
+                                    0L, TimeUnit.MILLISECONDS,
+                                    new LinkedBlockingQueue<Runnable>()));
+
+    public static ExecutorService newFixedThreadPool(int nThreads) {
+        return new ThreadPoolExecutor(nThreads, nThreads,
+                                      0L, TimeUnit.MILLISECONDS,
+                                      new LinkedBlockingQueue<Runnable>());
+    }
+    }
+```
+
+由以上线程池的实现代码可以看到，他们都只是 ThreadPoolExecutor 类的封装。来看下 ThreadPoolExecutor 最重要的构造函数：
+
+```
+ public ThreadPoolExecutor(int corePoolSize,
+                              int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue<Runnable> workQueue,
+                              ThreadFactory threadFactory,
+                              RejectedExecutionHandler handler)
+```
+
+其中，
+int corePoolSize, 指定线程池的线程数量
+int maximumPoolSize, 制定线程池中最大的线程数量
+long keepAliveTime, 当线程池中线程数量超过 corePoolSize 时，多余的线程的存活时间
+TimeUnit unit, keepAliveTime 的时间单位
+BlockingQueue<Runnable> workQueue, 任务队列，被提交尚未执行的任务
+ThreadFactory threadFactory,  **用于创建线程的线程工厂，一般用默认的**
+RejectedExecutionHandler handler, 拒绝策略
+
+### workQueue
+
+- 直接提交的队列
+SynchronousQueue实现，是一个特殊的BlockingQueue。没有容量，每一个插入操作，都要等待一个相应的删除操作，相反，每一个删除操作都要等待对应的插入操作。提交的任务不会被真实的保存，而是直接提交给线程执行。用在 cacheThreadPoolExecutor。
+
+- 有界的任务队列
+ArrayBlockingQueue(int capacity) 实现。
+**线程数量** < corePoolSize，直接新建线程；
+corePoolSize < **线程数量** < corePoolSize + 队列大小，放入队列；
+corePoolSize + 队列大小 < **线程数量** < maximumPoolSize，新建线程
+maximumPoolSize < **线程数量**，执行拒绝策略
+
+- 无界的任务队列
+LinkedBlockingQueue( ) 实现。
+**线程数量** < corePoolSize，直接新建线程；
+corePoolSize < **线程数量** < corePoolSize + 队列大小，放入队列；
+corePoolSize + 队列大小 < **线程数量**，执行拒绝策略
+
+- 优先的任务队列
+PriorityBlockingQueue实现，可以控制任务的执行先后顺序。是一个特殊的无界队列。
 
 ### 参数
 ThreadPoolExecutor类可设置的参数主要有：
@@ -32,12 +157,6 @@ allowCoreThreadTimeout：
 queueCapacity：
 任务队列容量。从maxPoolSize的描述上可以看出，任务队列的容量会影响到线程的变化，因此任务队列的长度也需要恰当的设置。
 
-线程池按以下行为执行任务：
-1. 当线程数小于核心线程数时，创建线程。
-2. 当线程数大于等于核心线程数，且任务队列未满时，将任务放入任务队列。
-3. 当线程数大于等于核心线程数，且任务队列已满
-若线程数小于最大线程数，创建线程
-若线程数等于最大线程数，抛出异常，拒绝任务
 
 ### 系统负载
 参数的设置跟系统的负载有直接的关系，下面为系统负载的相关参数：
