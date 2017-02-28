@@ -33,7 +33,7 @@ keywords: 同步容器, 并发容器, Thread, HashMap
 - 对应的非并发容器：HashMap 
 - 目标：代替Hashtable、synchronizedMap，支持复合操作 
 - 原理：JDK6中采用一种更加细粒度的加锁机制Segment“分段锁”，**减少粗粒度**，JDK8中采用CAS无锁算法
-- 更多介绍，请参考 [ConcurrentHashMap总结](http://www.importnew.com/22007.html)，[ConcurrentHashMap](http://链接网址)
+- 更多介绍，请参考 [ConcurrentHashMap总结](https://my.oschina.net/hosee/blog/675884)，[ConcurrentHashMap](http://链接网址)，[ConcurrentHashMap原理分析](https://my.oschina.net/hosee/blog/639352)
 
 #### CopyOnWriteArrayList
 
