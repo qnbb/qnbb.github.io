@@ -57,6 +57,7 @@ public class SingletonFull {
 
 - 优点：第一次引用时，创建instance；线程安全
 - 原因：巧妙的使用内部类和类的初始化方式
+
 ```
 /**
  * Created by mh on 17-2-28.
@@ -80,7 +81,9 @@ public class SingletonHungry {
 
 #### 使用场景
 
+
 1. spring 的 @Scope("singleton")
+
 ```
 protected Object getSingleton(String beanName, boolean allowEarlyReference) {  
   Object singletonObject = this.singletonObjects.get(beanName);  
@@ -100,6 +103,7 @@ protected Object getSingleton(String beanName, boolean allowEarlyReference) {
   return (singletonObject != NULL_OBJECT ? singletonObject : null);  
  }  
 ```
+
 spring依赖注入时，使用了双重判断加锁的单例模式，首先从缓存中获取bean实例，如果为null，对缓存map加锁，然后再从缓存中获取bean，如果继续为null，就创建一个bean。这样双重判断，能够避免在加锁的瞬间，有其他依赖注入引发bean实例的创建，从而造成重复创建的结果。
 
 2. AOP的切点定义中
