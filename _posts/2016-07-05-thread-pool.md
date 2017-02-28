@@ -110,13 +110,13 @@ JDK1.5中引入了强大的concurrent包，其中最常用的莫过了线程池�
 ```
 
 其中，
-int corePoolSize, 指定线程池的线程数量
-int maximumPoolSize, 制定线程池中最大的线程数量
-long keepAliveTime, 当线程池中线程数量超过 corePoolSize 时，多余的线程的存活时间
-TimeUnit unit, keepAliveTime 的时间单位
-BlockingQueue<Runnable> workQueue, 任务队列，被提交尚未执行的任务
-ThreadFactory threadFactory,  **用于创建线程的线程工厂，一般用默认的**
-RejectedExecutionHandler handler, 拒绝策略
+1. int corePoolSize, 指定线程池的线程数量
+2. int maximumPoolSize, 制定线程池中最大的线程数量
+3. long keepAliveTime, 当线程池中线程数量超过 corePoolSize 时，多余的线程的存活时间
+4. TimeUnit unit, keepAliveTime 的时间单位
+5. BlockingQueue<Runnable> workQueue, 任务队列，被提交尚未执行的任务
+6. ThreadFactory threadFactory,  **用于创建线程的线程工厂，一般用默认的**
+7. RejectedExecutionHandler handler, 拒绝策略
 
 ### workQueue
 
