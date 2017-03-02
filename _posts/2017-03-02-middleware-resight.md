@@ -1,7 +1,7 @@
 ---
 layout: post
 title: MiddleWare
-categories: blog
+categories: Blog
 description: MiddleWare
 keywords: MiddleWare
 ---
