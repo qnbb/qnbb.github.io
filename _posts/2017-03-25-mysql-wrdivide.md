@@ -11,6 +11,7 @@ keywords: write read divide
 
 - 让读库分担 主库的读压力，
 - 提高性能
+
 	1. 主从只负责各自的写和读，极大程度的缓解X锁和S锁争用
 	2. 从库可配置myisam引擎，提升查询性能以及节约系统开销
 - 增加冗余
@@ -21,9 +22,9 @@ keywords: write read divide
 
      - MySQL同步的流程大致如下: 
      1. 主服务器(master)将变更事件(更新、删除、表结构改变等等)写入二进制日志(master log)。 
-     2. 从服务器(slave)的IO线程从主服务器(binlog dump线程)获取二进制日志，并在本地保存一份自己的二进制日志(relay log) 
-	
+     2. 从服务器(slave)的IO线程从主服务器(binlog dump线程)获取二进制日志，并在本地保存一份自己的二进制日志(relay log) 	
      3. 从服务器的SQL线程读取本地日志(relay log)，并重演变更事件。
+
 - 对数据源的选择问题
 	- 应用程序与ＤＢ之间有个中央控制台服务器，根据负载均衡策略决定访问哪一台DB服务器
 
@@ -54,8 +55,8 @@ MySQL Proxy的工作原理也较简单。在Proxy启动时可以指定Proxy所�
 
 ### 疑问：
 
-#### 如何实现主服务器 把 binlog传输到从服务器？
-1.1 MySQL的同步机制是依赖Slave主动向Master发请求来获取数据的。
+#### 如何实现主服务器 把 binlog传输到从服务器？ 
+1. MySQL的同步机制是依赖Slave主动向Master发请求来获取数据的。
 从服务器配置主服务器的ip，账号密码等，通过mysql的语句进行复制,如
 ```
 # 执行同步命令，设置主数据库ip，同步帐号密码，同步位置 
@@ -64,7 +65,7 @@ mysql>change master to master_host='192.168.1.2',master_user='slave',master_pass
 # 开启同步功能 
 mysql>start slave;
 ```
-1.2 百度用bigpine消息队列 进行复制
+2. 百度用bigpine消息队列 进行复制
 
 #### 主服务器 复制binlog到从服务器时，是否需要对binlog进行加锁？这个性能消耗不是很大?
 目前的了解是需要加锁，
