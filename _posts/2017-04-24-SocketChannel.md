@@ -1,71 +1,218 @@
 ---
 layout: post
-title: 虚拟内存地址和物理内存地址
-categories: OS
-description: 虚拟内存地址和物理内存地址
-keywords: 虚拟内存地址和, 理内存地址
+title: Socket 通道
+categories: JAVA, NIO
+description: Socket 通道
+keywords: JAVA, NIO
 ---
 
-在进入正题前先来谈谈操作系统内存管理机制的发展历程，了解这些有利于我们更好的理解目前操作系统的内存管理机制。
+### Socket 通道
 
-### 一、早期的内存分配机制
+Channel 用于在字节缓冲区和位于通道另一侧的实体(通常是一个文件或套接字)之间有效地传输数据。通道可以形象地比喻为银行出纳窗口使用的气动导管。您的薪水支票就是您要传送的信息,载体(Carrier)就好比一个缓冲区。您先填充缓冲区(将您的支票放到载体上),接着将缓冲“写”到通道中(将载体丢进导管中),然后信息负载就被传递到通道另一侧的 I/O 服务(银行出纳员)。
 
-在早期的计算机中，要运行一个程序，会把这些程序全都装入内存，程序都是直接运行在内存上的，也就是说程序中访问的内存地址都是实际的物理内存地址。当计算机同时运行多个程序时，必须保证这些程序用到的内存总量要小于计算机实际物理内存的大小。那当程序同时运行多个程序时，操作系统是如何为这些程序分配内存的呢？下面通过实例来说明当时的内存分配方法：
+该过程的回应是:出纳员填充缓冲区(将您的收据放到载体上),接着开始一个反方向的通道传输(将载体丢回到导管中)。载体就到了通道的您这一侧(一个填满了的缓冲区正等待您的查验),然后您就会 flip 缓冲区(打开盖子)并将它清空(移除您的收据)。现在您可以开车走了,下一个对象(银行客户)将使用同样的载体(Buffer)和导管(Channel)对象来重复上述过程。
 
-````
-某台计算机总的内存大小是128M，现在同时运行两个程序A和B，A需占用内存10M，B需占用内存110。计算机在给程序分配内存时会采取这样的方法：先将内存中的前10M分配给程序A，接着再从内存中剩余的118M中划分出110M分配给程序B。这种分配方法可以保证程序A和程序B都能运行，但是这种简单的内存分配策略问题很多。
+DatagramChannel 和 SocketChannel 实现定义读和写功能的接口而ServerSocketChannel不实现。ServerSocketChannel 负责监听传入的连接和创建新的 SocketChannel 对象,它本身从不传输数据。
+
+在我们具体讨论每一种 socket 通道前,您应该了解 socket 和 socket 通道之间的关系。之前的章节中有写道,通道是一个连接 I/O 服务导管并提供与该服务交互的方法。就某个 socket 而言,它不会再次实现与之对应的 socket 通道类中的 socket 协议 API,而 java.net 中已经存在的 socket 通道都可以被大多数协议操作重复使用。
+
+全部 socket 通道类(DatagramChannel、SocketChannel 和ServerSocketChannel)在被实例化时都会创建一个对等 socket 对象。这些是我们所熟悉的来自 java.net 的类(Socket、ServerSocket和 DatagramSocket),它们已经被更新以识别通道。对等 socket 可以通过调用 socket( )方法从一个通道上获取。此外,这三个 java.net 类现在都有 getChannel( )方法。
+
+#### ServerSocketChannel
+
+```
+public abstract class ServerSocketChannel
+extends AbstractSelectableChannel
+{
+public static ServerSocketChannel open( ) throws IOException
+public abstract ServerSocket socket( );
+public abstract ServerSocket accept( ) throws IOException;
+public final int validOps( )
+}
+```
+ServerSocketChannel 是一个基于通道的 socket 监听器。它同我们所熟悉的 java.net.ServerSocket执行相同的基本任务,不过它增加了通道语义,因此能够在非阻塞模式下运行。用静态的 open( )工厂方法创建一个新的ServerSocketChannel 对象,将会返回同一个未绑定的java.net.ServerSocket 关联的通道。该对等 ServerSocket 可以通过在返回的 ServerSocketChannel 上调用 socket( )方法来获取。
+
+作为 ServerSocketChannel 的对等体被创建的 ServerSocket 对象依赖通道实
+现。这些 socket 关联的 SocketImpl 能识别通道。通道不能被封装在随意的 socket 对象外面。
+
+由于 ServerSocketChannel 没有 bind( )方法,因此有必要取出对等的 socket 并使用它来绑定到一个端口以开始监听连接。我们也是使用对等 ServerSocket 的 API 来根据需要设置其他的 socket 选项。
+
+```
+ServerSocketChannel ssc = ServerSocketChannel.open( );
+ServerSocket serverSocket = ssc.socket( );
+// Listen on port 1234
+serverSocket.bind (new InetSocketAddress (1234));
 ```
 
-早期的内存分配方法如图：
- ![](/images/posts/os/earlyHeap.jpg)
+同它的对等体 java.net.ServerSocket 一样,ServerSocketChannel 也有 accept( )方法。一旦您创建了一个 ServerSocketChannel 并用对等 socket 绑定了它,然后您就可以在其中一个上调用 accept( )。如果您选择在 ServerSocket 上调用 accept( )方法,那么它会同任何其他的 ServerSocket 表现一样的行为:总是阻塞并返回一个 java.net.Socket 对象。
 
-- 问题1：进程地址空间不隔离。
-由于程序都是直接访问物理内存，所以恶意程序可以随意修改别的进程的内存数据，以达到破坏的目的。有些非恶意的，但是有bug的程序也可能不小心修改了其它程序的内存数据，就会导致其它程序的运行出现异常。这种情况对用户来说是无法容忍的，因为用户希望使用计算机的时候，其中一个任务失败了，至少不能影响其它的任务。
+**如果您选择在 ServerSocketChannel 上调用 accept( )方法则会返回SocketChannel 类型的对象,返回的对象能够在非阻塞模式下运行。**假设系统已经有一个安全管理器(security manager),两种形式的方法调用都执行相同的安全检查。
 
-- 问题2：内存使用效率低。
-在A和B都运行的情况下，如果用户又运行了程序C，而程序C需要20M大小的内存才能运行，而此时系统只剩下8M的空间可供使用，所以此时系统必须在已运行的程序中选择一个将该程序的数据暂时拷贝到硬盘上，释放出部分空间来供程序C使用，然后再将程序C的数据全部装入内存中运行。可以想象得到，在这个过程中，有大量的数据在装入装出，导致效率十分低下。
+如果以非阻塞模式被调用,当没有传入连接在等时，ServerSocketChannel.accept( )会立即返回 null。正是这种检查连接而不阻塞的能力实现了可伸缩性并降低了复杂性。可选择性也因此得到实现。我们可以使用一个选择器实例来注册一个 ServerSocketChannel 对象以实现新连接到达时自动通知的功能。下面的例子演示了如何使用一个非阻塞的 accept( )方法:
 
-- 问题3：程序运行的地址不确定。
-当内存中的剩余空间可以满足程序C的要求后，操作系统会在剩余空间中随机分配一段连续的20M大小的空间给程序C使用，因为是随机分配的，所以程序运行的地址是不确定的。
+```
+/**
+ * Created by mh on 17-4-21.
+ */
+import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.net.InetSocketAddress;
+/**
+ * Test nonblocking accept( ) using ServerSocketChannel.
+ * Start this program, then "telnet localhost 1234" to
+ * connect to it.
+ *
+ */
+public class ChannelAccept
+{
+	public static final String GREETING = "Hello I must be going.\r\n";
+	public static void main (String [] argv)
+			throws Exception
+	{
+		int port = 1234; // default
+		if (argv.length > 0) {
+			port = Integer.parseInt (argv [0]);
+		}
+		ByteBuffer buffer = ByteBuffer.wrap (GREETING.getBytes( ));
+		ServerSocketChannel ssc = ServerSocketChannel.open( );
+		ssc.socket( ).bind (new InetSocketAddress (port));
+		ssc.configureBlocking (false);
+		while (true) {
+			System.out.println ("Waiting for connections " + port++);
+			// 区别 ssc.socket.accept(),非阻塞，返回一个SocketChannel对象
+			SocketChannel sc = ssc.accept( );
+			if (sc == null) {
+// no connections, snooze a while
+				Thread.sleep (2000);
+			} else {
+				System.out.println ("Incoming connection from: "
+						+ sc.socket().getRemoteSocketAddress( ));
+				buffer.rewind( );
+				sc.write (buffer);
+				sc.close( );
+			}
+		}
+	}
+}
+```
+结果如下，ServerSocketChannel一直等待客户端Socket的连接：
+```
+Waiting for connections 1234
+Waiting for connections 1235
+Waiting for connections 1236
+Waiting for connections 1237
+Waiting for connections 1238
+Waiting for connections 1239
+Waiting for connections 1240
+Waiting for connections 1241
+...
+```
 
-### 二、分段
+#### SocketChannel
 
-为了解决上述问题，人们想到了一种变通的方法，就是增加一个中间层，利用一种间接的地址访问方法访问物理内存。按照这种方法，程序中访问的内存地址不再是实际的物理内存地址，而是一个虚拟地址，然后由操作系统将这个虚拟地址映射到适当的物理内存地址上。这样，只要操作系统处理好虚拟地址到物理内存地址的映射，就可以保证不同的程序最终访问的内存地址位于不同的区域，彼此没有重叠，就可以达到内存地址空间隔离的效果。
+```
+public abstract class SocketChannel
+extends AbstractSelectableChannel
+implements ByteChannel, ScatteringByteChannel, GatheringByteChannel
+{
+// This is a partial API listing
+public static SocketChannel open( ) throws IOException
+public static SocketChannel open (InetSocketAddress remote)
+throws IOException
+public abstract Socket socket( );
+public abstract boolean connect (SocketAddress remote)
+throws IOException;
+public abstract boolean isConnectionPending( );
+public abstract boolean finishConnect( ) throws IOException;
+public abstract boolean isConnected( );
+public final int validOps( )
+}
+```
 
-当创建一个进程时，操作系统会为该进程分配一个4GB大小的虚拟进程地址空间。之所以是4GB，是因为在32位的操作系统中，一个指针长度是4字节，而4字节指针的寻址能力是从0x00000000~0xFFFFFFFF，最大值0xFFFFFFFF表示的即为4GB大小的容量。与虚拟地址空间相对的，还有一个物理地址空间，这个地址空间对应的是真实的物理内存。如果你的计算机上安装了512M大小的内存，那么这个物理地址空间表示的范围是0x00000000~0x1FFFFFFF。当操作系统做虚拟地址到物理地址映射时，只能映射到这一范围，操作系统也只会映射到这一范围。当进程创建时，每个进程都会有一个自己的4GB虚拟地址空间。要注意的是这个4GB的地址空间是“虚拟”的，并不是真实存在的，而且每个进程只能访问自己虚拟地址空间中的数据，无法访问别的进程中的数据，通过这种方法实现了进程间的地址隔离。那是不是这4GB的虚拟地址空间应用程序可以随意使用呢？很遗憾，在Windows系统下，这个虚拟地址空间被分成了4部分：NULL指针区、用户区、64KB禁入区、内核区。应用程序能使用的只是用户区而已，大约2GB左右(最大可以调整到3GB)。内核区为2GB，内核区保存的是系统线程调度、内存管理、设备驱动等数据，这部分数据供所有的进程共享，但应用程序是不能直接访问的。
+Socket 和 SocketChannel 类封装点对点、有序的网络连接,类似于我们所熟知并喜爱的 TCP/IP网络连接。SocketChannel 扮演客户端发起同一个监听服务器的连接。直到连接成功,它才能收到数据并且只会从连接到的地址接收。
 
-人们之所以要创建一个虚拟地址空间，目的是为了解决进程地址空间隔离的问题。但程序要想执行，必须运行在真实的内存上，所以，必须在虚拟地址与物理地址间建立一种映射关系。这样，通过映射机制，当程序访问虚拟地址空间上的某个地址值时，就相当于访问了物理地址空间中的另一个值。人们想到了一种分段(Sagmentation)的方法，它的思想是在虚拟地址空间和物理地址空间之间做一一映射。比如说虚拟地址空间中某个10M大小的空间映射到物理地址空间中某个10M大小的空间。这种思想理解起来并不难，操作系统保证不同进程的地址空间被映射到物理地址空间中不同的区域上，这样每个进程最终访问到的
+每个 SocketChannel 对象创建时都是同一个对等的 java.net.Socket 对象串联的。静态的 open( )方法可以创建一个新的 SocketChannel 对象,而在新创建的 SocketChannel 上调用 socket( )方法能返回它对等的 Socket 对象;在该 Socket 上调用 getChannel( )方法则能返回最初的那个 SocketChannel。
 
-物理地址空间都是彼此分开的。通过这种方式，就实现了进程间的地址隔离。还是以实例说明，假设有两个进程A和B，进程A所需内存大小为10M，其虚拟地址空间分布在0x00000000到0x00A00000，进程B所需内存为100M，其虚拟地址空间分布为0x00000000到0x06400000。那么按照分段的映射方法，进程A在物理内存上映射区域为0x00100000到0x00B00000，，进程B在物理内存上映射区域为0x00C00000到0x07000000。于是进程A和进程B分别被映射到了不同的内存区间，彼此互不重叠，实现了地址隔离。从应用程序的角度看来，进程A的地址空间就是分布在0x00000000到0x00A00000，在做开发时，开发人员只需访问这段区间上的地址即可。应用程序并不关心进程A究竟被映射到物理内存的那块区域上了，所以程序的运行地址也就是相当于说是确定的了。 图二显示的是分段方式的内存映射方法。
+我们可以通过在通道上直接调用 connect( )方法或在通道关联的 Socket 对象上调用 connect( )来将该 socket 通道连接。一旦一个 socket 通道被连接,它将保持连接状态直到被关闭。您可以通过调用布尔型的 isConnected( )方法来测试某个SocketChannel 当前是否已连接。
 
-分段方式的内存映射方法:
-![](/images/posts/os/fenduanheap.jpg)
+第二种带 InetSocketAddress 参数形式的 open( )是在返回之前进行连接的便捷方法。这段代码:
+```
+SocketChannel socketChannel =
+SocketChannel.open (new InetSocketAddress ("somehost", somePort));
+```
+等价于下面这段代码:
+```
+SocketChannel socketChannel = SocketChannel.open( );
+socketChannel.connect (new InetSocketAddress ("somehost", somePort));
+```
 
-这种分段的映射方法虽然解决了上述中的问题一和问题三，但并没能解决问题二，即内存的使用效率问题。在分段的映射方法中，每次换入换出内存的都是整个程序，这样会造成大量的磁盘访问操作，导致效率低下。所以这种映射方法还是稍显粗糙，粒度比较大。实际上，程序的运行有局部性特点，在某个时间段内，程序只是访问程序的一小部分数据，也就是说，程序的大部分数据在一个时间段内都不会被用到。基于这种情况，人们想到了粒度更小的内存分割和映射方法，这种方法就是分页(Paging)。
+如果您选择使用传统方式进行连接——通过在对等 Socket 对象上调用 connect( )方法，那么传统的连接语义将适用于此。线程在连接建立好或超时过期之前都将保持阻塞。如果您选择通过在通道上直接调用 connect( )方法来建立连接并且通道处于阻塞模式(默认模式),那么连接过程实际上是一样的。
 
-### 三、分页
+在 SocketChannel 上并没有一种 connect( )方法可以让您指定超时(timeout)值,当 connect( )方法在非阻塞模式下被调用时 SocketChannel 提供并发连接：它发起对请求地址的连接并且立即返回值。如果返回值是 true，说明连接立即建立了(这可能是本地环回连接)；如果连接不能立即建立,connect( )方法会返回 false 且并发地继续连接建立过程。
 
-计算机会对虚拟内存地址空间（32位为4G）分页产生页（page），对物理内存地址空间（假设256M）分页产生页帧（page frame），这个页和页帧的大小是一样大的，所以呢，在这里，虚拟内存页的个数势必要大于物理内存页帧的个数。在计算机上有一个页表（page table），就是映射虚拟内存页到物理内存页的，更确切的说是页号到页帧号的映射，而且是一对一的映射。但是问题来了，虚拟内存页的个数 > 物理内存页帧的个数，岂不是有些虚拟内存页的地址永远没有对应的物理内存地址空间？不是的，操作系统是这样处理的。操作系统有个页面失效（page fault）功能。操作系统找到一个最少使用的页帧，让他失效，并把它写入磁盘，随后把需要访问的页放到页帧中，并修改页表中的映射，这样就保证所有的页都有被调度的可能了。这就是处理虚拟内存地址到物理内存的步骤。
+面向流的的 socket 建立连接状态需要一定的时间，因为两个待连接系统之间必须进行包对话，以建立维护流 socket 所需的状态信息。跨越开放互联网连接到远程系统会特别耗时。假如某个SocketChannel 上当前正由一个并发接，isConnectPending( )方法就会返回 true 值。
 
+以下是一段用来管理异步连接的可用代码。
 
-分页的基本方法是，将地址空间分成许多的页。每页的大小由CPU决定，然后由操作系统选择页的大小。目前Inter系列的CPU支持4KB或4MB的页大小，而PC上目前都选择使用4KB。按这种选择，4GB虚拟地址空间共可以分成1048576个页，512M的物理内存可以分为131072个页。显然虚拟空间的页数要比物理空间的页数多得多。
+```
+/**
+ * Created by mh on 17-4-21.
+ */
+import java.nio.channels.SocketChannel;
+import java.net.InetSocketAddress;
+/**
+ * Demonstrate asynchronous connection of a SocketChannel.
+ * @author Ron Hitchens (ron@ronsoft.com)
+ */
+public class ConnectAsync
+{
+	public static void main (String [] argv) throws Exception
+	{
+		String host = "localhost";
+		int port = 1234;
+		if (argv.length == 2) {
+			host = argv [0];
+			port = Integer.parseInt (argv [1]);
+		}
+		InetSocketAddress addr = new InetSocketAddress (host, port);
+		SocketChannel sc = SocketChannel.open( );
+		sc.configureBlocking (false);
+		System.out.println ("initiating connection");
+		sc.connect (addr);
+		while ( ! sc.finishConnect( )) {
+			doSomethingUseful( );
+		}
+		System.out.println ("connection established");
+// Do something with the connected socket
+// The SocketChannel is still nonblocking
+		sc.close( );
+	}
+	private static void doSomethingUseful( )
+	{
+		System.out.println ("doing something useless");
+	}
+}
+```
+和之前 ServerSocketChannel 的代码可以完成Socket连接，结果如下：
 
-在分段的方法中，每次程序运行时总是把程序全部装入内存，而分页的方法则有所不同。分页的思想是程序运行时用到哪页就为哪页分配内存，没用到的页暂时保留在硬盘上。当用到这些页时再在物理地址空间中为这些页分配内存，然后建立虚拟地址空间中的页和刚分配的物理内存页间的映射。
+ServerSocketChannel:
+```
+Waiting for connections1234
+Waiting for connections1235
+Waiting for connections1236
+Waiting for connections1237
+Incoming connection from: /127.0.0.1:38252
+Waiting for connections1238
+Waiting for connections1239
+Waiting for connections1240
+...
+```
+SocketChannel:
+```
+initiating connection
+connection established
 
-下面通过介绍一个可执行文件的装载过程来说明分页机制的实现方法。一个可执行文件(PE文件)其实就是一些编译链接好的数据和指令的集合，它也会被分成很多页，在PE文件执行的过程中，它往内存中装载的单位就是页。当一个PE文件被执行时，操作系统会先为该程序创建一个4GB的进程虚拟地址空间。前面介绍过，虚拟地址空间只是一个中间层而已，它的功能是利用一种映射机制将虚拟地址空间映射到物理地址空间，所以，创建4GB虚拟地址空间其实并不是要真的创建空间，只是要创建那种映射机制所需要的数据结构而已，这种数据结构就是页目和页表。
+Process finished with exit code 0
+```
 
-当创建完虚拟地址空间所需要的数据结构后，进程开始读取PE文件的第一页。在PE文件的第一页包含了PE文件头和段表等信息，进程根据文件头和段表等信息，将PE文件中所有的段一一映射到虚拟地址空间中相应的页(PE文件中的段的长度都是页长的整数倍)。这时PE文件的真正指令和数据还没有被装入内存中，操作系统只是根据PE文件的头部等信息建立了PE文件和进程虚拟地址空间中页的映射关系而已。当CPU要访问程序中用到的某个虚拟地址时，当CPU发现该地址并没有相相关联的物理地址时，CPU认为该虚拟地址所在的页面是个空页面，CPU会认为这是个页错误(Page Fault)，CPU也就知道了操作系统还未给该PE页面分配内存，CPU会将控制权交还给操作系统。操作系统于是为该PE页面在物理空间中分配一个页面，然后再将这个物理页面与虚拟空间中的虚拟页面映射起来，然后将控制权再还给进程，进程从刚才发生页错误的位置重新开始执行。由于此时已为PE文件的那个页面分配了内存，所以就不会发生页错误了。随着程序的执行，页错误会不断地产生，操作系统也会为进程分配相应的物理页面来满足进程执行的需求。
-
-分页方法的核心思想就是当可执行文件执行到第x页时，就为第x页分配一个内存页y，然后再将这个内存页添加到进程虚拟地址空间的映射表中,这个映射表就相当于一个y=f(x)函数。应用程序通过这个映射表就可以访问到x页关联的y页了。
-
-
-### 四、总结
-
-##### 什么是物理内存的概念，虚拟内存的概念？
-物理内存，在应用中，自然是顾名思义，物理上，真实的插在板子上的内存是多大就是多大了。而在CPU中的概念，物理内存就是CPU的地址线可以直接进行寻址的内存空间大小。比如8086只有20根地址线，那么它的寻址空间就是1MB，我们就说8086能支持1MB的物理内存，及时我们安装了128M的内存条在板子上，我们也只能说8086拥有1MB的物理内存空间。同理我们现在大部分使用的是32位的机子，32位的386以上CPU就可以支持最大4GB的物理内存空间了。
-
-先说说为什么会有虚拟内存和物理内存的区别。正在运行的一个进程，他所需的内存是有可能大于内存条容量之和的，比如你的内存条是256M，你的程序却要创建一个2G的数据区，那么不是所有数据都能一起加载到内存（物理内存）中，势必有一部分数据要放到其他介质中（比如硬盘），待进程需要访问那部分数据时，在通过调度进入物理内存。所以，虚拟内存是进程运行时所有内存空间的总和，并且可能有一部分不在物理内存中，而物理内存就是我们平时所了解的内存条。有的地方呢，也叫这个虚拟内存为内存交换区。关键的是不要把虚拟内存跟真实的插在主板上的内存条相挂钩，虚拟内存它是“虚拟的”不存在，假的啦，它只是内存管理的一种抽象！
-
-那么，什么是虚拟内存地址和物理内存地址呢。假设你的计算机是32位，那么它的地址总线是32位的，也就是它可以寻址0~0xFFFFFFFF（4G）的地址空间，但如果你的计算机只有256M的物理内存0x~0x0FFFFFFF（256M），同时你的进程产生了一个不在这256M地址空间中的地址，那么计算机该如何处理呢？回答这个问题前，先说明计算机的内存分页机制。
-
-综上，虚拟内存地址由页号（与页表中的页号关联）和偏移量组成。页号就不必解释了，上面已经说了，页号对应的映射到一个页帧。那么，说说偏移量。偏移量就是我上面说的页（或者页帧）的大小，即这个页（或者页帧）到底能存多少数据。举个例子，有一个虚拟地址它的页号是4，偏移量是20，那么他的寻址过程是这样的：首先到页表中找到页号4对应的页帧号（比如为8），如果页不在内存中，则用失效机制调入页，否则把页帧号和偏移量传给MMU（CPU的内存管理单元）组成一个物理上真正存在的地址，接着就是访问物理内存中的数据了。总结起来说，虚拟内存地址的大小是与地址总线位数相关，物理内存地址的大小跟物理内存条的容量相关。
