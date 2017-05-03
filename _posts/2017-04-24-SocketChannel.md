@@ -1,12 +1,11 @@
 ---
 layout: post
 title: Socket 通道
-categories: JAVA, NIO
+categories: [Java, NIO]
 description: Socket 通道
 keywords: JAVA, NIO
 ---
 
-### Socket 通道
 
 Channel 用于在字节缓冲区和位于通道另一侧的实体(通常是一个文件或套接字)之间有效地传输数据。通道可以形象地比喻为银行出纳窗口使用的气动导管。您的薪水支票就是您要传送的信息,载体(Carrier)就好比一个缓冲区。您先填充缓冲区(将您的支票放到载体上),接着将缓冲“写”到通道中(将载体丢进导管中),然后信息负载就被传递到通道另一侧的 I/O 服务(银行出纳员)。
 
