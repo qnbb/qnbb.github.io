@@ -7,14 +7,14 @@ keywords: 反射, 编译, 加载
 ---
 
 
-### 1. Class类
+## 1. Class类
 
-#### 在面向对象的世界里，万事万物皆对象。
+##### 在面向对象的世界里，万事万物皆对象。
 
 Java语言中，基本数据类型（int->Integer包装类）、静态成员（不属于对象，属于类）是对象吗？
 类是谁的对象？（Student类是对象，是java.lang.Class类的实例对象）
 
-#### 这个对象到底如何表示呢？参看以下code
+##### 这个对象到底如何表示呢？参看以下code
 
 ```
 public class ClassDemo1 {
@@ -88,9 +88,9 @@ System.out.println(c5.getName()); //void
 }
 ```
 
-### 2. 简述编译与加载
+## 2. 简述编译与加载
 
-#### 编译时 会涉及到类加载吗？
+##### 编译时 会涉及到类加载吗？
 
 编译的时候、运行的时候加载类是不同的两个概念。
 重点需要关注的时候是运行的时候在什么情况下会触发类的加载。
@@ -106,7 +106,7 @@ java需要加载一个class的时候只有在下面集中情况下才会发生�
 
 java中, 编译就是解析源代码生成字节码的过程. 所有的源代码都会被编译成对应的字节码指令. 在这个过程中, 某些语句会对其他类库中的类产生引用, 那么编译器为了保证语句的正确, 必须通过加载该被引用的类来进行验证。由于java的默认单根继承机制(Object), 编译时加载类是无法避免的。
 
-#### JAVA 是动态性的解释型编程语言
+##### JAVA 是动态性的解释型编程语言
 
 Java 语言是一种具有动态性的解释型编程语言，当指定程序运行的时候， Java 虚拟机就将编译生成的 . class 文件按照需求和一定的规则加载进内存，并组织成为一个完整的 Java 应用程序。 Java 语言把每个单独的类 Class 和接口 Implements 编译成单独的一个 . class 文件，这些文件对于 Java 运行环境来说就是一个个可以动态加载的单元。
 
@@ -132,7 +132,7 @@ public static void main(String args[]){
 
 JRE （ JavaRuntime Environment ）首先加载 ClassLoaderTest 文件，然后再加载 TestClassA 文件，从而实现了动态加载。
 
-#### 预先加载与依需求加载
+##### 预先加载与依需求加载
 
 Java 运行环境为了优化系统，提高程序的执行速度，在 JRE 运行的开始会将 Java 运行所需要的基本类采用预先加载（ pre-loading ）的方法全部加载要内存当中，因为这些单元在 Java 程序运行的过程当中经常要使用的，主要包括 JRE 的 rt.jar 文件里面所有的 .class 文件。
 
@@ -144,7 +144,7 @@ Java 运行环境为了优化系统，提高程序的执行速度，在 JRE 运�
 
 我们在定义一个类实例的时候，比如 TestClassA testClassA ，这个时候 testClassA 的值为 null ，也就是说还没有初始化，没有调用 TestClassA 的构造函数，只有当执行 testClassA = new TestClassA() 以后， JRE 才正真把 TestClassA （运行时）加载进来。
 
-#### 隐式加载和显示加载
+##### 隐式加载和显示加载
 
 Java 的加载方式分为隐式加载（ implicit ）和显示加载（ explicit ），上面的例子中就是用的隐式加载的方式。所谓隐式加载就是我们在程序中用 new 关键字来定义一个实例变量， JRE 在执行到 new 关键字的时候就会把对应的实例类加载进入内存。隐式加载的方法很常见，用的也很多， JRE 系统在后台自动的帮助用户加载，减少了用户的工作量，也增加了系统的安全性和程序的可读性。无法进行动态加载，new的这个 Class 对象必须是你程序代码编译的时候有的。
 
@@ -203,9 +203,9 @@ factory = (ExampleInterface)c.newInstance();
 
 首先，newInstance( )是一个方法，而new是一个关键字； 其次，Class下的newInstance()的使用有局限，因为它生成对象只能调用无参的构造函数，而使用 new关键字生成对象没有这个限制。 简言之：newInstance(): 弱类型,低效率,只能调用无参构造。new: 强类型,相对高效,能调用任何public构造。Class.forName( )返回的是类。Class.forName( ).newInstance()返回的是object。
 
-### 3. 获取类类型后，基本API（方法、成员变量、构造函数）
+## 3. 获取类类型后，基本API（方法、成员变量、构造函数）
 
-#### Class类的基本API
+##### Class类的基本API
 
 ```
 import java.lang.reflect.Constructor;
@@ -295,12 +295,15 @@ System.out.println(")");
 
 ```
 
-### 4. 方法的反射
+## 4. 方法的反射
 
-#### 如何获取某个方法
-  方法的名称和参数列表才能唯一决定某个方法
-#### 方法的反射操作
-  method.invoke(对象，参数列表)
+##### 如何获取某个方法
+
+方法的名称和参数列表才能唯一决定某个方法
+
+##### 方法的反射操作
+
+method.invoke(对象，参数列表)
 
 ```
 import java.lang.reflect.Method;
